@@ -745,15 +745,6 @@ impl CredenceBond {
         governance_approval::initialize_governance(&e, governors, quorum_bps, min_governors);
     }
 
-    /// Top up the bond with additional amount (checks for overflow)
-    pub fn top_up(e: Env, amount: i128) -> IdentityBond {
-        let key = DataKey::Bond;
-        let mut bond = e
-            .storage()
-            .instance()
-            .get::<_, IdentityBond>(&key)
-            .unwrap_or_else(|| panic!("no bond"));
-
     pub fn governance_vote(e: Env, voter: Address, proposal_id: u64, approve: bool) {
         pausable::require_not_paused(&e);
         voter.require_auth();
