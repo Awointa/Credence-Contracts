@@ -21,6 +21,7 @@ mod nonce;
 mod parameters;
 pub mod pausable;
 mod rolling_bond;
+mod slashing;
 mod tiered_bond;
 mod token_integration;
 pub mod types;
@@ -756,6 +757,12 @@ impl CredenceBond {
         governance_approval::delegate(&e, &governor, &to);
     }
 
+    pub fn propose_slash(e: Env, proposer: Address, amount: i128) -> u64 {
+        pausable::require_not_paused(&e);
+        proposer.require_auth();
+        governance_approval::propose_slash(&e, &proposer, amount)
+    }
+
     pub fn execute_slash_with_governance(
         e: Env,
         proposer: Address,
@@ -1027,7 +1034,7 @@ impl CredenceBond {
             active: false,
             is_rolling: bond.is_rolling,
             withdrawal_requested_at: bond.withdrawal_requested_at,
-            notice_period: bond.notice_period,
+            notice_period_duration: bond.notice_period_duration,
         };
         e.storage().instance().set(&bond_key, &updated);
         let cb_key = Symbol::new(&e, "callback");
@@ -1079,7 +1086,7 @@ impl CredenceBond {
             active: bond.active,
             is_rolling: bond.is_rolling,
             withdrawal_requested_at: bond.withdrawal_requested_at,
-            notice_period: bond.notice_period,
+            notice_period_duration: bond.notice_period_duration,
         };
         e.storage().instance().set(&bond_key, &updated);
         let cb_key = Symbol::new(&e, "callback");
