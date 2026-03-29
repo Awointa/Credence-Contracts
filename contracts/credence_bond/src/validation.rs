@@ -75,6 +75,17 @@ mod tests {
     }
 }
 
+// Duration Validation Module
+//
+// Provides validation logic for bond durations including minimum and maximum limit
+// enforcement. All bond creations must pass duration validation before proceeding.
+//
+// Constraints:
+// - Minimum Duration: Bonds must have a duration of at least 1 day (86_400 seconds)
+//   to prevent trivially short bonds that offer no meaningful commitment.
+// - Maximum Duration: Bonds are capped at 365 days (31_536_000 seconds) to limit
+//   excessive lock-up risk and contract state lifetime.
+
 /// Minimum bond duration in seconds (1 day = 86_400 seconds).
 pub const MIN_BOND_DURATION: u64 = 86_400;
 
