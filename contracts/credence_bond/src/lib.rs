@@ -7,6 +7,7 @@ use soroban_sdk::{
 
 pub mod access_control;
 mod batch;
+mod cooldown;
 pub mod early_exit_penalty;
 mod emergency;
 mod events;
@@ -18,7 +19,6 @@ mod leverage;
 #[allow(dead_code)]
 mod math;
 mod nonce;
-mod cooldown;
 mod parameters;
 pub mod pausable;
 pub mod rolling_bond;
@@ -414,7 +414,10 @@ impl CredenceBond {
         notice_period_duration: u64,
     ) -> IdentityBond {
         validation::validate_bond_amount(amount);
-        if e.storage().instance().has(&parameters::ParameterKey::MaxLeverage) {
+        if e.storage()
+            .instance()
+            .has(&parameters::ParameterKey::MaxLeverage)
+        {
             leverage::validate_leverage(amount, parameters::get_max_leverage(&e));
         }
         // Validate duration early so callers that expect validation errors do not
