@@ -3,11 +3,7 @@
 use super::*;
 use crate::receiver::{FlashLoanReceiver, FLASH_LOAN_SUCCESS};
 use soroban_sdk::testutils::{Address as _, Events};
-use soroban_sdk::{contract, contractimpl, token, vec, Address, Bytes, Env, IntoVal, Symbol, Val};
-
-// --- Mock Token ---
-// We use the built-in token testutils or a simple mock.
-// Re-using soroban_sdk::token::Client is easier.
+use soroban_sdk::{contract, contractimpl, token, Address, Bytes, Env, Symbol};
 
 // --- Mock Receivers ---
 
@@ -24,7 +20,7 @@ impl FlashLoanReceiver for ValidReceiver {
         fee: i128,
         _data: Bytes,
     ) -> Symbol {
-        // 1. Mandatory Security Check: Verify caller is the trusted treasury
+        // Mandatory Security Check: Verify caller is the trusted treasury
         let treasury: Address = e
             .storage()
             .instance()
@@ -121,7 +117,6 @@ fn setup_test(
 
     let token_admin = Address::generate(e);
     let token_id = e.register_stellar_asset_contract(token_admin.clone());
-    let token = token::TokenClient::new(e, &token_id);
     let token_admin_client = token::StellarAssetClient::new(e, &token_id);
 
     treasury.set_token(&token_id);
@@ -136,7 +131,7 @@ fn setup_test(
 fn test_flash_loan_success() {
     let e = Env::default();
     e.mock_all_auths();
-    let (treasury, _, admin, token_id) = setup_test(&e);
+    let (treasury, _, _admin, token_id) = setup_test(&e);
 
     // Set 0.5% fee (50 bps)
     treasury.set_flash_loan_fee(&50);
