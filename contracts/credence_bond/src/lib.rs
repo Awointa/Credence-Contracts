@@ -473,7 +473,11 @@ impl CredenceBond {
         let old_tier = BondTier::Bronze;
         let new_tier = tiered_bond::get_tier_for_amount(net_amount);
         tiered_bond::emit_tier_change_if_needed(&e, &identity, old_tier, new_tier);
+        
+        // Emit both old and new events for backward compatibility during migration
         events::emit_bond_created(&e, &identity, amount, duration, is_rolling);
+        events::emit_bond_created_v2(&e, &identity, amount, duration, is_rolling, bond_start);
+        
         bond
     }
 
@@ -483,6 +487,44 @@ impl CredenceBond {
             .instance()
             .get::<_, IdentityBond>(&DataKey::Bond)
             .unwrap_or_else(|| panic!("no bond"))
+    }
+
+    /// Check if bond is currently active and can accept user actions.
+    /// 
+    /// This function should be called before any user action that requires
+    /// an active bond, ensuring inactive bonds cannot accept actions.
+    /// 
+    /// # Returns
+    /// * `true` if bond exists and is active
+    /// * `false` if bond does not exist or is inactive
+    /// 
+    /// # Panics
+    /// * If bond configuration is invalid
+    pub fn is_bond_active(e: Env) -> bool {
+        match e.storage().instance().get::<_, IdentityBond>(&DataKey::Bond) {
+            Some(bond) => bond.active,
+            None => false,
+        }
+    }
+
+    /// Require that bond is active before proceeding with an action.
+    /// 
+    /// This is a helper function to ensure consistent validation
+    /// across all functions that require an active bond.
+    /// 
+    /// # Panics
+    /// * "bond not found" if no bond exists
+    /// * "bond not active" if bond exists but is inactive
+    fn require_active_bond(e: &Env) {
+        let bond: IdentityBond = e
+            .storage()
+            .instance()
+            .get(&DataKey::Bond)
+            .unwrap_or_else(|| panic!("bond not found"));
+            
+        if !bond.active {
+            panic!("bond not active - cannot perform action");
+        }
     }
 
     /// Add an attestation for a subject.
@@ -632,6 +674,126 @@ impl CredenceBond {
         nonce::get_nonce(&e, &identity)
     }
 
+    // ── Market Activation Validation ──────────────────────────────────────────────────────────
+
+    /// Validates all required parameters before bond activation.
+    /// 
+    /// This function enforces comprehensive validation to prevent activation with
+    /// incomplete or invalid risk parameters, as required by issue #179.
+    /// 
+    /// # Arguments
+    /// * `e` - Soroban environment
+    /// * `amount` - Bond amount to validate
+    /// * `duration` - Bond duration in seconds
+    /// * `is_rolling` - Whether this is a rolling bond
+    /// * `notice_period_duration` - Notice period duration for rolling bonds
+    /// 
+    /// # Panics
+    /// * If any required parameter is missing or invalid
+    /// * If token configuration is incomplete
+    /// * If risk parameters are out of acceptable ranges
+    fn validate_bond_activation_parameters(
+        e: &Env,
+        amount: i128,
+        duration: u64,
+        is_rolling: bool,
+        notice_period_duration: u64,
+    ) {
+        // 1. Validate bond amount using existing validation
+        validation::validate_bond_amount(amount);
+        
+        // 2. Validate bond duration using existing validation
+        validation::validate_bond_duration(duration);
+        
+        // 3. Validate token configuration is complete
+        let token_addr = e.storage().instance().get::<_, Address>(&DataKey::BondToken);
+        if token_addr.is_none() {
+            panic!("bond token not configured - cannot activate bond");
+        }
+        
+        // 4. Validate fee configuration is set
+        let (treasury_opt, fee_bps) = fees::get_config(e);
+        if treasury_opt.is_none() {
+            panic!("fee treasury not configured - cannot activate bond");
+        }
+        
+        // 5. Validate rolling bond specific parameters
+        if is_rolling {
+            if notice_period_duration == 0 {
+                panic!("rolling bonds require non-zero notice period duration");
+            }
+            if notice_period_duration > duration {
+                panic!("notice period cannot exceed bond duration");
+            }
+            // Validate notice period against configured cooldown
+            let cooldown_period = cooldown::get_cooldown_period(e);
+            if notice_period_duration < cooldown_period {
+                panic!("notice period must be at least cooldown period ({} seconds)", cooldown_period);
+            }
+        }
+        
+        // 6. Validate tier thresholds are configured (prevent activation with zero thresholds)
+        let bronze_threshold = parameters::get_bronze_threshold(e);
+        let silver_threshold = parameters::get_silver_threshold(e);
+        let gold_threshold = parameters::get_gold_threshold(e);
+        let platinum_threshold = parameters::get_platinum_threshold(e);
+        
+        if bronze_threshold <= 0 {
+            panic!("bronze threshold not configured - cannot activate bond");
+        }
+        if silver_threshold <= bronze_threshold {
+            panic!("silver threshold must be greater than bronze threshold");
+        }
+        if gold_threshold <= silver_threshold {
+            panic!("gold threshold must be greater than silver threshold");
+        }
+        if platinum_threshold <= gold_threshold {
+            panic!("platinum threshold must be greater than gold threshold");
+        }
+        
+        // 7. Validate max leverage is configured and reasonable
+        let max_leverage = parameters::get_max_leverage(e);
+        if max_leverage == 0 {
+            panic!("max leverage not configured - cannot activate bond");
+        }
+        
+        // 8. Validate attester stake requirement is set
+        let min_stake = verifier::get_min_stake(e);
+        if min_stake < 0 {
+            panic!("invalid verifier stake requirement - cannot activate bond");
+        }
+        
+        // 9. Validate emergency configuration if enabled
+        let emergency_config = emergency::get_config(e);
+        if emergency_config.enabled {
+            if emergency_config.governance.is_none() {
+                panic!("emergency mode enabled but governance not configured - cannot activate bond");
+            }
+            if emergency_config.treasury.is_none() {
+                panic!("emergency mode enabled but treasury not configured - cannot activate bond");
+            }
+            if emergency_config.emergency_fee_bps > 10000 {
+                panic!("emergency fee exceeds maximum (10000 bps = 100%)");
+            }
+        }
+        
+        // 10. Additional parameter range validations
+        if amount == 0 {
+            panic!("bond amount cannot be zero");
+        }
+        
+        // Validate amount against tier thresholds
+        if amount < bronze_threshold {
+            panic!("bond amount below minimum threshold (bronze tier)");
+        }
+        
+        // Validate leverage constraints
+        let leverage = amount / validation::MIN_BOND_AMOUNT;
+        if leverage > max_leverage as i128 {
+            panic!("bond amount exceeds maximum leverage limit");
+        }
+    }
+
     // ── Grace window ──────────────────────────────────────────────────────────
 
     /// Set the post-deadline grace window (in seconds). Only admin can call.
@@ -671,6 +833,9 @@ impl CredenceBond {
     }
 
     pub fn withdraw_bond(e: Env, amount: i128) -> IdentityBond {
+        // Ensure bond is active before allowing withdrawal
+        Self::require_active_bond(&e);
+        
         let key = DataKey::Bond;
         let mut bond = e
             .storage()
@@ -713,7 +878,11 @@ impl CredenceBond {
         let new_tier = tiered_bond::get_tier_for_amount(bond.bonded_amount);
         tiered_bond::emit_tier_change_if_needed(&e, &bond.identity, old_tier, new_tier);
         e.storage().instance().set(&key, &bond);
+        
+        // Emit both old and new events for backward compatibility during migration
         events::emit_bond_withdrawn(&e, &bond.identity, amount, bond.bonded_amount);
+        events::emit_bond_withdrawn_v2(&e, &bond.identity, amount, bond.bonded_amount, e.ledger().timestamp(), false, 0);
+        
         bond
     }
 
@@ -785,6 +954,12 @@ impl CredenceBond {
         let new_tier = tiered_bond::get_tier_for_amount(bond.bonded_amount);
         tiered_bond::emit_tier_change_if_needed(&e, &bond.identity, old_tier, new_tier);
         e.storage().instance().set(&key, &bond);
+        
+        // Emit both old and new events for backward compatibility during migration
+        // For early withdrawal, we emit the v2 event with penalty information
+        events::emit_bond_withdrawn(&e, &bond.identity, amount, bond.bonded_amount);
+        events::emit_bond_withdrawn_v2(&e, &bond.identity, amount, bond.bonded_amount, e.ledger().timestamp(), true, penalty);
+        
         bond
     }
 
@@ -969,31 +1144,27 @@ impl CredenceBond {
 
         let key = DataKey::Bond;
         let mut bond: IdentityBond = e
-            .storage()
-            .instance()
-            .get(&key)
-            .unwrap_or_else(|| panic!("no bond"));
+}
 
-        bond.identity.require_auth();
-
-        // Overflow check before token transfer (CEI pattern)
-        let new_bonded = bond
-            .bonded_amount
-            .checked_add(amount)
-            .expect("top-up caused overflow");
-
-        let old_tier = tiered_bond::get_tier_for_amount(bond.bonded_amount);
-        bond.bonded_amount = new_bonded;
-        token_integration::transfer_into_contract(&e, &bond.identity, amount);
-        let new_tier = tiered_bond::get_tier_for_amount(bond.bonded_amount);
-        tiered_bond::emit_tier_change_if_needed(&e, &bond.identity, old_tier, new_tier);
-        events::emit_bond_increased(&e, &bond.identity, amount, bond.bonded_amount);
-
-        e.storage().instance().set(&key, &bond);
-        bond
-    }
-
-    pub fn increase_bond(e: Env, caller: Address, amount: i128) -> IdentityBond {
+pub fn extend_duration(e: Env, additional_duration: u64) -> IdentityBond {
+    let key = DataKey::Bond;
+    let mut bond = e
+        .storage()
+        .instance()
+        .get::<_, IdentityBond>(&key)
+        .unwrap_or_else(|| panic!("no bond"));
+    bond.identity.require_auth();
+    bond.bond_duration = bond
+        .bond_duration
+        .checked_add(additional_duration)
+        .expect("duration overflow");
+    let _end = bond
+        .bond_start
+        .checked_add(bond.bond_duration)
+        .expect("bond end overflow");
+    e.storage().instance().set(&key, &bond);
+    bond
+}
         caller.require_auth();
         if amount <= 0 {
             panic!("amount must be positive");
@@ -1017,9 +1188,10 @@ impl CredenceBond {
             let new_amount = old_amount
                 .checked_add(amount)
                 .expect("bond increase caused overflow");
-            let token_client = TokenClient::new(&e, &token_addr);
-            let contract_address = e.current_contract_address();
-            token_client.transfer_from(&contract_address, &caller, &contract_address, &amount);
+            
+            // Use safe token operations
+            crate::safe_token::safe_transfer_from(&e, &caller, amount);
+            
             let old_tier = tiered_bond::get_tier_for_amount(old_amount);
             let new_tier = tiered_bond::get_tier_for_amount(new_amount);
             bond.bonded_amount = new_amount;

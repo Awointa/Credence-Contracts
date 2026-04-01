@@ -17,10 +17,6 @@ fn network_key(e: &Env) -> Symbol {
     Symbol::new(e, "usdc_net")
 }
 
-fn token_client(e: &Env) -> TokenClient<'_> {
-    let token = get_token(e);
-    TokenClient::new(e, &token)
-}
 
 /// @notice Sets the token contract used by bond operations.
 /// @dev Requires admin auth and stores token in instance storage.
@@ -68,19 +64,9 @@ pub fn get_usdc_network(e: &Env) -> Option<String> {
 }
 
 /// @notice Checks if owner has enough allowance for the contract to spend amount.
-/// @dev Uses token allowance(owner, spender) where spender is the bond contract.
+/// @dev Uses safe allowance checking with proper error handling.
 pub fn require_allowance(e: &Env, owner: &Address, amount: i128) {
-    if amount < 0 {
-        panic!("amount must be non-negative");
-    }
-    if amount == 0 {
-        return;
-    }
-    let contract = e.current_contract_address();
-    let allowance = token_client(e).allowance(owner, &contract);
-    if allowance < amount {
-        panic!("insufficient token allowance");
-    }
+    safe_token::safe_require_allowance(e, owner, amount);
 }
 
 /// @notice Transfers tokens from owner into the bond contract.

@@ -336,7 +336,7 @@ pub fn process_claims(
             .set(&DataKey::ClaimableAmount(user.clone()), &remaining_amount);
     }
 
-    // Transfer tokens to user
+    // Transfer tokens to user using safe token operations
     if total_amount > 0 {
         let token: Address = e
             .storage()
