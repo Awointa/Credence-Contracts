@@ -27,6 +27,7 @@ mod slash_history;
 mod slashing;
 pub mod tiered_bond;
 mod token_integration;
+pub mod upgrade_auth;
 pub mod types;
 mod validation;
 pub mod verifier;
@@ -118,7 +119,21 @@ pub enum DataKey {
     ClaimableAmount(Address),
     ClaimCounter,
     BondToken,
+    Token,
     GraceWindow, // FIX 1: added for configurable post-expiry grace window
+    // Claims module storage keys
+    PendingClaims(Address),
+    ClaimableAmount(Address),
+    ClaimCounter,
+    ClaimById(u64),
+    // Upgrade authorization storage keys
+    UpgradeAuth(Address),
+    AuthorizedUpgraders,
+    Implementation,
+    UpgradeAdmin,
+    UpgradeProposal(u64),
+    NextProposalId,
+    UpgradeHistory,
 }
 
 #[contract]
