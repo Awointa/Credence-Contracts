@@ -27,8 +27,8 @@ mod slash_history;
 mod slashing;
 pub mod tiered_bond;
 mod token_integration;
-pub mod upgrade_auth;
 pub mod types;
+pub mod upgrade_auth;
 mod validation;
 pub mod verifier;
 mod weighted_attestation;
@@ -177,7 +177,7 @@ impl CredenceBond {
             .storage()
             .instance()
             .get(&DataKey::Admin)
-            .unwrap_or_else(|| panic!("not initialized"));
+            .unwrap_or_else(|| panic!("contract not initialized - admin not set"));
         if stored != *admin {
             panic!("not admin");
         }
@@ -206,6 +206,12 @@ impl CredenceBond {
         pausable::require_not_paused(&e);
         admin.require_auth();
         Self::require_admin_internal(&e, &admin);
+
+        // Zero-address check
+        if treasury.to_string().to_string() == "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" {
+            panic!("ZeroAddress");
+        }
+
         early_exit_penalty::set_config(&e, treasury, penalty_bps);
     }
 
@@ -219,6 +225,15 @@ impl CredenceBond {
     ) {
         admin.require_auth();
         Self::require_admin_internal(&e, &admin);
+
+        // Zero-address checks
+        if governance.to_string().to_string() == "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" {
+            panic!("ZeroAddress");
+        }
+        if treasury.to_string().to_string() == "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" {
+            panic!("ZeroAddress");
+        }
+
         emergency::set_config(&e, governance, treasury, emergency_fee_bps, enabled);
     }
 
@@ -313,6 +328,12 @@ impl CredenceBond {
     /// Register an authorized attester (only admin can call).
     pub fn register_attester(e: Env, attester: Address) {
         pausable::require_not_paused(&e);
+
+        // Zero-address check
+        if attester.to_string().to_string() == "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" {
+            panic!("ZeroAddress");
+        }
+
         let admin: Address = e
             .storage()
             .instance()
@@ -366,6 +387,11 @@ impl CredenceBond {
         verifier_addr: Address,
         stake_deposit: i128,
     ) -> verifier::VerifierInfo {
+        // Zero-address check
+        if verifier_addr.to_string().to_string() == "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" {
+            panic!("ZeroAddress");
+        }
+
         verifier_addr.require_auth();
         Self::with_reentrancy_guard(&e, || {
             verifier::register_with_stake(&e, &verifier_addr, stake_deposit)
@@ -1657,6 +1683,9 @@ mod security;
 #[cfg(test)]
 mod test;
 #[cfg(test)]
+mod test_zero_address_working;
+
+#[cfg(test)]
 mod test_access_control;
 #[cfg(test)]
 mod test_attestation;
@@ -1713,6 +1742,8 @@ mod test_rolling_bond;
 mod test_slashing;
 #[cfg(test)]
 mod test_tiered_bond;
+#[cfg(test)]
+mod test_upgrade_auth;
 #[cfg(test)]
 mod test_validation;
 #[cfg(test)]
