@@ -18,7 +18,7 @@ fn setup_with_standard_token(
     let client = CredenceBondClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
-    let user = Address::generate(&env);
+    let _user = Address::generate(&env);
     let token_id = env
         .register_stellar_asset_contract_v2(admin.clone())
         .address();
@@ -115,7 +115,7 @@ fn bond_rejects_fee_on_transfer_token_on_create() {
     let client = CredenceBondClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
-    let user = Address::generate(&env);
+    let _user = Address::generate(&env);
 
     client.initialize(&admin);
 

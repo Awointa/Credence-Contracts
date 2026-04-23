@@ -1842,13 +1842,6 @@ mod test_attestation;
 mod test_attestation_types;
 #[cfg(test)]
 mod test_batch;
-
-#[cfg(test)]
-mod test_attestation;
-#[cfg(test)]
-mod test_attestation_types;
-#[cfg(test)]
-mod test_batch;
 #[cfg(test)]
 mod test_cooldown;
 #[cfg(test)]
