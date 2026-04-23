@@ -3,6 +3,8 @@
 use crate::test_helpers::*;
 use crate::{
     apply_bps,
+    MIN_BOND_DURATION_SECS,
+    MAX_BOND_DURATION_SECS,
     FixedDurationBond,
     FixedDurationBondClient,
     MAX_FEE_BPS,
@@ -114,6 +116,29 @@ fn test_create_bond_zero_duration_panics() {
     let e = Env::default();
     let (client, _admin, owner, _token, _cid) = setup(&e);
     client.create_bond(&owner, &1_000_i128, &0_u64);
+}
+
+#[test]
+#[should_panic(expected = "duration out of allowed bounds")]
+fn test_create_bond_duration_above_max_panics() {
+    let e = Env::default();
+    let (client, _admin, owner, _token, _cid) = setup(&e);
+    client.create_bond(&owner, &1_000_i128, &(MAX_BOND_DURATION_SECS + 1));
+}
+
+#[test]
+fn test_create_bond_duration_at_bounds_succeeds() {
+    let e = Env::default();
+    let (client, _admin, owner, _token, _cid) = setup(&e);
+
+    let min_bond = client.create_bond(&owner, &1_000_i128, &MIN_BOND_DURATION_SECS);
+    assert_eq!(min_bond.bond_duration, MIN_BOND_DURATION_SECS);
+
+    e.ledger().with_mut(|li| li.timestamp += MIN_BOND_DURATION_SECS + 1);
+    client.withdraw(&owner);
+
+    let max_bond = client.create_bond(&owner, &1_000_i128, &MAX_BOND_DURATION_SECS);
+    assert_eq!(max_bond.bond_duration, MAX_BOND_DURATION_SECS);
 }
 
 #[test]
@@ -778,10 +803,9 @@ fn test_arithmetic_max_duration_safe_timestamp_no_overflow() {
     e.ledger().with_mut(|li| li.timestamp = 0);
     let (client, _admin, owner, _tok, _cid) = setup(&e);
 
-    // 365 days — well within u64 range.
-    let bond = client.create_bond(&owner, &1_000_i128, &(365 * ONE_DAY));
-    assert_eq!(bond.bond_duration, 365 * ONE_DAY);
-    assert_eq!(bond.bond_expiry, 365 * ONE_DAY);
+    let bond = client.create_bond(&owner, &1_000_i128, &MAX_BOND_DURATION_SECS);
+    assert_eq!(bond.bond_duration, MAX_BOND_DURATION_SECS);
+    assert_eq!(bond.bond_expiry, MAX_BOND_DURATION_SECS);
 }
 
 /// Expiry timestamp overflow is caught and panics cleanly.
