@@ -23,6 +23,7 @@ mod nonce;
 mod parameters;
 pub mod pausable;
 pub mod rolling_bond;
+mod safe_token;
 mod same_ledger_liquidation_guard;
 mod slash_history;
 mod slashing;
@@ -33,7 +34,7 @@ pub mod upgrade_auth;
 mod validation;
 pub mod verifier;
 mod weighted_attestation;
-mod safe_token;
+
 
 use crate::access_control::{
     add_verifier_role, is_verifier, remove_verifier_role, require_verifier,
@@ -1936,10 +1937,11 @@ impl CredenceBond {
         );
     }
 
-    pub fn get_upgrade_auth(e: Env, address: Address) -> Option<upgrade_auth::UpgradeAuthorization> {
-        e.storage()
-            .instance()
-            .get(&DataKey::UpgradeAuth(address))
+    pub fn get_upgrade_auth(
+        e: Env,
+        address: Address,
+    ) -> Option<upgrade_auth::UpgradeAuthorization> {
+        e.storage().instance().get(&DataKey::UpgradeAuth(address))
     }
 
     pub fn get_upgrade_proposal(e: Env, proposal_id: u64) -> Option<upgrade_auth::UpgradeProposal> {

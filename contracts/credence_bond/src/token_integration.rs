@@ -31,7 +31,9 @@ pub fn set_token(e: &Env, admin: &Address, token: &Address) {
     }
 
     // Zero-address check
-    if token.to_string() == soroban_sdk::String::from_str(e, "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA") {
+    if token.to_string()
+        == soroban_sdk::String::from_str(e, "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+    {
         panic!("ZeroAddress");
     }
 
@@ -42,7 +44,9 @@ pub fn set_token(e: &Env, admin: &Address, token: &Address) {
 /// @dev Network label is informational for auditing and can be "mainnet" or "testnet".
 pub fn set_usdc_token(e: &Env, admin: &Address, token: &Address, network: &String) {
     // Zero-address check
-    if token.to_string() == soroban_sdk::String::from_str(e, "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA") {
+    if token.to_string()
+        == soroban_sdk::String::from_str(e, "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+    {
         panic!("ZeroAddress");
     }
 
