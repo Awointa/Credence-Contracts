@@ -20,6 +20,8 @@ pub mod liquidation_scanner;
 #[allow(dead_code)]
 mod math;
 mod nonce;
+#[allow(dead_code)]
+mod normalization;
 mod parameters;
 pub mod pausable;
 pub mod rolling_bond;
@@ -1815,11 +1817,6 @@ mod security;
 #[cfg(test)]
 mod test;
 #[cfg(test)]
-mod test_liquidation_scanner;
-#[cfg(test)]
-mod test_zero_address_working;
-
-#[cfg(test)]
 mod test_access_control;
 #[cfg(test)]
 mod test_attestation;
@@ -1830,11 +1827,19 @@ mod test_batch;
 #[cfg(test)]
 mod test_cooldown;
 #[cfg(test)]
+mod test_create_bond;
+#[cfg(test)]
+mod test_decimals;
+#[cfg(test)]
+mod test_duration_validation;
+#[cfg(test)]
 mod test_early_exit_penalty;
 #[cfg(test)]
 mod test_emergency;
 #[cfg(test)]
 mod test_events;
+#[cfg(test)]
+mod test_events_v2;
 #[cfg(test)]
 mod test_evidence;
 #[cfg(test)]
@@ -1846,7 +1851,15 @@ mod test_grace_period;
 #[cfg(test)]
 mod test_helpers;
 #[cfg(test)]
+mod test_immutable_config;
+#[cfg(test)]
+mod test_immutable_config_working;
+#[cfg(test)]
 mod test_increase_bond;
+#[cfg(test)]
+mod test_liquidation_scanner;
+#[cfg(test)]
+mod test_market_activation;
 #[cfg(test)]
 mod test_math;
 #[cfg(test)]
@@ -1881,6 +1894,9 @@ mod test_verifier;
 mod test_weighted_attestation;
 #[cfg(test)]
 mod test_withdraw_bond;
-// removed test_grace_window per checklist (file not present)
+#[cfg(test)]
+mod test_zero_address;
+#[cfg(test)]
+mod test_zero_address_working;
 #[cfg(test)]
 mod token_integration_test;
